@@ -154,8 +154,8 @@ func GithubAppSetup(c *gin.Context) {
 
 	host := os.Getenv("HOSTNAME")
 	manifest := &githubAppRequest{
-		Name:        fmt.Sprintf("Digger app %v", rand.Int31()),
-		Description: fmt.Sprintf("Digger hosted at %s", host),
+		Name:        fmt.Sprintf("Augur app %v", rand.Int31()),
+		Description: fmt.Sprintf("Augur hosted at %s", host),
 		URL:         host,
 		RedirectURL: fmt.Sprintf("%s/github/exchange-code", host),
 		Public:      false,
@@ -749,7 +749,7 @@ func handleIssueCommentEvent(gh utils.GithubClientProvider, payload *github.Issu
 	}
 
 	if !strings.HasPrefix(*payload.Comment.Body, "mantis") {
-		log.Printf("comment is not a Digger command, ignoring")
+		log.Printf("comment is not a mantis command, ignoring")
 		return nil
 	}
 
@@ -762,7 +762,7 @@ func handleIssueCommentEvent(gh utils.GithubClientProvider, payload *github.Issu
 		}
 		utils.InitCommentReporter(ghService, issueNumber, fmt.Sprintf(":x: Could not load digger config, error: %v", err))
 		log.Printf("getDiggerConfigForPR error: %v", err)
-		return fmt.Errorf("error getting digger config")
+		return fmt.Errorf("error getting mantis config")
 	}
 
 	err = ghService.CreateCommentReaction(commentId, string(dg_github.GithubCommentEyesReaction))
@@ -783,9 +783,9 @@ func handleIssueCommentEvent(gh utils.GithubClientProvider, payload *github.Issu
 
 	diggerCommand, err := orchestrator.GetCommandFromComment(*payload.Comment.Body)
 	if err != nil {
-		log.Printf("unkown digger command in comment: %v", *payload.Comment.Body)
+		log.Printf("unkown mantis command in comment: %v", *payload.Comment.Body)
 		utils.InitCommentReporter(ghService, issueNumber, fmt.Sprintf(":x: Could not recognise comment, error: %v", err))
-		return fmt.Errorf("unkown digger command in comment %v", err)
+		return fmt.Errorf("unkown mantis command in comment %v", err)
 	}
 
 	prBranchName, _, err := ghService.GetBranchName(issueNumber)
@@ -1045,7 +1045,7 @@ func CreateDiggerWorkflowWithPullRequest(org *models.Organisation, client *githu
 		}
 
 		// TODO: move to a separate config
-		jobName := "Digger Workflow"
+		jobName := "Augur Workflow"
 		setupAws := false
 		disableLocking := false
 		diggerHostname := os.Getenv("DIGGER_CLOUD_HOSTNAME")
@@ -1077,7 +1077,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 `, jobName, setupAws, disableLocking, diggerHostname, diggerOrg)
 
-		commitMessage := "Configure Digger workflow"
+		commitMessage := "Configure mantis workflow"
 		var req github.RepositoryContentFileOptions
 		req.Content = []byte(workflowFileContents)
 		req.Message = &commitMessage
@@ -1088,12 +1088,12 @@ jobs:
 			return fmt.Errorf("failed to create digger workflow file, %w", err)
 		}
 
-		prTitle := "Configure Digger"
+		prTitle := "Configure Mantis"
 		pullRequest := &github.NewPullRequest{Title: &prTitle,
 			Head: &branch, Base: &defaultBranch}
 		_, _, err = client.PullRequests.Create(ctx, repoOwner, repoName, pullRequest)
 		if err != nil {
-			return fmt.Errorf("failed to create a pull request for digger/configure, %w", err)
+			return fmt.Errorf("failed to create a pull request for mantis/configure, %w", err)
 		}
 	}
 	return nil

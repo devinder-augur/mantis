@@ -1,19 +1,20 @@
 package models
 
 import (
+	"log"
+	"os"
+
 	"gorm.io/driver/postgres"
 	_ "gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"log"
-	"os"
 )
 
 type Database struct {
 	GormDB *gorm.DB
 }
 
-var DEFAULT_ORG_NAME = "digger"
+var DEFAULT_ORG_NAME = "augur"
 
 // var DB *gorm.DB
 var DB *Database

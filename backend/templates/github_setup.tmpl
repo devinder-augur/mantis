@@ -78,6 +78,9 @@
         <li class="config"><strong>gh-app-client-secret:</strong> <pre>{{ .ClientSecret }}</pre></li>
         <li class="config"><strong>gh-app-key-file Base64 encoded:</strong> <pre id="b64">{{ .KeyBase64 }}</pre></li>
         <li class="config"><strong>gh-webhook-secret:</strong> <pre>{{ .WebhookSecret }}</pre></li>
+        <strong>environment vars</strong> 
+	<pre>export GITHUB_APP_ID={{ .ID }}; export GITHUB_APP_CLIENT_ID={{ .ClientID }}; export GITHUB_APP_CLIENT_SECRET={{ .ClientSecret }}; export GITHUB_APP_PRIVATE_KEY_BASE64={{ .KeyBase64 }} ;export GITHUB_WEBHOOK_SECRET={{ .WebhookSecret }}
+	</pre>
       </ul>
     {{ end }}
   </section>

@@ -276,6 +276,7 @@ func (d DiggerExecutor) Plan() (*terraform_utils.PlanSummary, bool, bool, string
 		}
 	}
 	reportAdditionalOutput(d.Reporter, d.projectId())
+	log.Printf("Line 279 in Plan() /cli/pkg/core/execution/execution.go %s", terraformPlanOutput)
 	return planSummary, true, !isEmptyPlan, plan, terraformPlanOutput, nil
 }
 

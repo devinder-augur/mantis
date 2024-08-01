@@ -134,6 +134,7 @@ func (d DiggerApi) ReportProjectJobStatus(repo string, projectName string, jobId
 		planFootprint = nil
 	} else {
 		planJson := planResult.TerraformJson
+		log.Printf("Path is cli/pkg/backend/diggerapi.go: %s", planJson)
 		planSummary := planResult.PlanSummary
 		planSummaryJson = planSummary.ToJson()
 		planFootprint, err = terraform_utils.GetPlanFootprint(planJson)

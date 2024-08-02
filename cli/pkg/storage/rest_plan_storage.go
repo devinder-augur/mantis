@@ -23,18 +23,18 @@ func (psg *PlanStorageRest) PlanExists(artifactName string, storedPlanFilePath s
 
 func (psr *PlanStorageRest) StorePlanFile(fileContents []byte, artifactName string, fileName string) error {
 
-	terraformPlanJson := string(fileContents)
-	headers := map[string]string{
-		"Content-Type": "application/json",
-	}
-	jsonPayload := RestPlanBody{
-		PRURL:  psr.PrURl,
-		TfFile: terraformPlanJson,
-	}
-	jsonBody, err := json.Marshal(jsonPayload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
+	// terraformPlanJson := string(fileContents)
+	// headers := map[string]string{
+	// 	"Content-Type": "application/json",
+	// }
+	// jsonPayload := RestPlanBody{
+	// 	PRURL:  psr.PrURl,
+	// 	TfFile: terraformPlanJson,
+	// }
+	// jsonBody, err := json.Marshal(jsonPayload)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to marshal JSON: %w", err)
+	// }
 
 	//doRequest(psr.Method, psr.Endpoint, headers, jsonBody)
 	return nil

@@ -36,7 +36,7 @@ func (psr *PlanStorageRest) StorePlanFile(fileContents []byte, artifactName stri
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
-	doRequest(psr.Method, psr.Endpoint, headers, jsonBody)
+	//doRequest(psr.Method, psr.Endpoint, headers, jsonBody)
 	return nil
 }
 

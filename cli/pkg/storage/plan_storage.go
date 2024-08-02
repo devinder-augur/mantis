@@ -251,7 +251,7 @@ func NewPlanStorage(ghToken string, ghRepoOwner string, ghRepositoryName string,
 		}
 	case uploadDestination == "rest":
 		method := strings.ToUpper(os.Getenv("PLAN_UPLOAD_HTTP_METHOD"))
-		url := strings.ToUpper(os.Getenv("PLAN_UPLOAD_HTTP_ENDPOINT"))
+		url := strings.ToLower(os.Getenv("PLAN_UPLOAD_HTTP_ENDPOINT"))
 		var pullRequestNumber *int
 		prNumber := 123
 		pullRequestNumber = &prNumber

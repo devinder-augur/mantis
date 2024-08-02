@@ -328,6 +328,8 @@ runs:
       shell: bash
       env:
         PLAN_UPLOAD_DESTINATION: ${{ inputs.upload-plan-destination }}
+        PLAN_UPLOAD_HTTP_METHOD: ${{ inputs.upload-plan-http-method }}
+        PLAN_UPLOAD_HTTP_ENDPOINT: ${{ inputs.upload-plan-http-endpoint }}
         GOOGLE_STORAGE_LOCK_BUCKET: ${{ inputs.google-lock-bucket }}
         GOOGLE_STORAGE_PLAN_ARTEFACT_BUCKET: ${{ inputs.upload-plan-destination-gcp-bucket }}
         AWS_S3_BUCKET: ${{ inputs.upload-plan-destination-s3-bucket }}
@@ -365,6 +367,8 @@ runs:
       env:
         actionref: ${{ github.action_ref }}
         PLAN_UPLOAD_DESTINATION: ${{ inputs.upload-plan-destination }}
+        PLAN_UPLOAD_HTTP_METHOD: ${{ inputs.upload-plan-http-method }}
+        PLAN_UPLOAD_HTTP_ENDPOINT: ${{ inputs.upload-plan-http-endpoint }}
         GOOGLE_STORAGE_LOCK_BUCKET: ${{ inputs.google-lock-bucket }}
         GOOGLE_STORAGE_PLAN_ARTEFACT_BUCKET: ${{ inputs.upload-plan-destination-gcp-bucket }}
         AWS_S3_BUCKET: ${{ inputs.upload-plan-destination-s3-bucket }}

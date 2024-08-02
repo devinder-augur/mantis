@@ -5,9 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/diggerhq/digger/cli/pkg/core/storage"
-	"github.com/diggerhq/digger/cli/pkg/usage"
-	"github.com/diggerhq/digger/libs/locking/gcp"
 	"io"
 	"log"
 	"net/http"
@@ -15,6 +12,10 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/diggerhq/digger/cli/pkg/core/storage"
+	"github.com/diggerhq/digger/cli/pkg/usage"
+	"github.com/diggerhq/digger/libs/locking/gcp"
 
 	"github.com/diggerhq/digger/cli/pkg/utils"
 
@@ -247,6 +248,18 @@ func NewPlanStorage(ghToken string, ghRepoOwner string, ghRepositoryName string,
 			Context: ctx,
 			Client:  client,
 			Bucket:  bucketName,
+		}
+	case uploadDestination == "rest":
+		method := strings.ToUpper(os.Getenv("PLAN_UPLOAD_HTTP_METHOD"))
+		url := strings.ToUpper(os.Getenv("PLAN_UPLOAD_HTTP_ENDPOINT"))
+		var pullRequestNumber *int
+		prNumber := 123
+		pullRequestNumber = &prNumber
+		prURL := fmt.Sprintf("https://github.com/%s/%s/pull/%d", ghRepoOwner, ghRepositoryName, *pullRequestNumber)
+		planStorage = &PlanStorageRest{
+			Endpoint: url,
+			Method:   method,
+			PrURl:    prURL,
 		}
 	case uploadDestination == "gitlab":
 		//TODO implement me

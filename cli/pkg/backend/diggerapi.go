@@ -110,7 +110,7 @@ func (d DiggerApi) ReportProjectRun(namespace string, projectName string, starte
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", d.AuthToken))
 
 	resp, err := d.HttpClient.Do(req)
-
+	println(resp)
 	if err != nil {
 		return fmt.Errorf("error while sending request: %v", err)
 	}

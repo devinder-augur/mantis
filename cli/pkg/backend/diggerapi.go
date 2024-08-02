@@ -110,7 +110,6 @@ func (d DiggerApi) ReportProjectRun(namespace string, projectName string, starte
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", d.AuthToken))
 
 	resp, err := d.HttpClient.Do(req)
-	println(resp)
 	if err != nil {
 		return fmt.Errorf("error while sending request: %v", err)
 	}
@@ -118,7 +117,25 @@ func (d DiggerApi) ReportProjectRun(namespace string, projectName string, starte
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status when reporting a project run: %v", resp.StatusCode)
 	}
+	
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("Could not read response body: %v", err)
+	}
 
+	// Unmarshal the response body into a map
+	var result map[string]interface{}
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return fmt.Errorf("Could not Unmarshal response body: %v", err)
+	}
+
+	// Marshal the map back into a JSON string
+	jsonString, err := json.Marshal(result)
+	if err != nil {
+		panic(err)
+	}
+	println(jsonString)
 	return nil
 }
 

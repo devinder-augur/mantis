@@ -141,7 +141,7 @@ func (d DiggerApi) ReportProjectJobStatus(repo string, projectName string, jobId
 		plan_upload_http_method := os.Getenv("PLAN_UPLOAD_HTTP_METHOD")
 
 		if plan_upload_destination == "rest" && plan_upload_http_endpoint != "" && plan_upload_http_method != "" {
-			sendPostRequest(plan_upload_http_endpoint, plan_upload_http_method, TFPostData{TfPlanJson: planJson, PrCommentUrl: PrCommentUrl, PlanDetails: planResult})
+			sendPostRequest(plan_upload_http_endpoint, plan_upload_http_method, TFPostData{TfPlanJson: planJson, PrCommentUrl: PrCommentUrl, PlanDetails: planResult, JobId: jobId})
 		}
 		planSummary := planResult.PlanSummary
 		planSummaryJson = planSummary.ToJson()

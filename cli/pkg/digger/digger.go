@@ -610,11 +610,12 @@ func RunJob(
 		switch command {
 		case "mantis plan":
 			err := usage.SendUsageRecord(requestedBy, job.EventName, "plan")
+			log.Info("Mantis plan line 613")			
 			if err != nil {
 				log.Printf("Failed to send usage report. %v", err)
 			}
 			_, _, _, plan, planJsonOutput, err := diggerExecutor.Plan()
-
+			log.Info("Mantis plan line 618")
 			if err != nil {
 				msg := fmt.Sprintf("Failed to Run mantis plan command. %v", err)
 				log.Printf(msg)
@@ -635,6 +636,7 @@ func RunJob(
 				}
 				return fmt.Errorf(msg)
 			}
+			log.Info("Mantis Plan allowed check")
 			if !planIsAllowed {
 				msg := fmt.Sprintf("Plan is not allowed")
 				log.Printf(msg)
@@ -644,13 +646,13 @@ func RunJob(
 				}
 				return fmt.Errorf(msg)
 			} else {
-
+				log.Info("Mantis Plan run detais check")
 				runDetails, err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "SUCCESS", command, plan)
 				log.Printf("Run Details are  %v",  runDetails)
 				if err != nil {
 					log.Printf("Error reporting Run: %v", err)
 				} else {
-					log.Printf("Sending Rrun Details  %v",  "1")
+					log.Info("Mantis Plan run detais planjsonoutput")
 					ReportRunData(planJsonOutput, runDetails.Id)
 				}
 

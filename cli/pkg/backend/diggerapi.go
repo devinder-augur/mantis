@@ -147,13 +147,6 @@ func (d DiggerApi) ReportProjectJobStatus(repo string, projectName string, jobId
 		planFootprint = nil
 	} else {
 		planJson := planResult.TerraformJson
-		plan_upload_destination := os.Getenv("PLAN_UPLOAD_DESTINATION")
-		plan_upload_http_endpoint := strings.ToLower(os.Getenv("PLAN_UPLOAD_HTTP_ENDPOINT"))
-		plan_upload_http_method := os.Getenv("PLAN_UPLOAD_HTTP_METHOD")
-
-		if plan_upload_destination == "rest" && plan_upload_http_endpoint != "" && plan_upload_http_method != "" {
-			sendPostRequest(plan_upload_http_endpoint, plan_upload_http_method, TFPostData{TfPlanJson: planJson, PrCommentUrl: PrCommentUrl, PlanDetails: planResult, JobId: jobId})
-		}
 		planSummary := planResult.PlanSummary
 		planSummaryJson = planSummary.ToJson()
 		planFootprint, err = terraform_utils.GetPlanFootprint(planJson)
@@ -221,32 +214,4 @@ func NewBackendApi(hostName string, authToken string) backend.Api {
 		}
 	}
 	return backendApi
-}
-
-type TFPostData struct {
-	TfPlanJson   string                              `json:"terraform_plan_json"`
-	JobId        string                              `json:"job_id"`
-	PrCommentUrl string                              `json:"pr_comment_url"`
-	PlanDetails  *execution.DiggerExecutorPlanResult `json:"plan_details"`
-}
-
-func sendPostRequest(url string, method string, data TFPostData) (*http.Response, error) {
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-
-	return resp, nil
 }

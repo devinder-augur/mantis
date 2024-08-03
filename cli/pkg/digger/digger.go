@@ -265,7 +265,7 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 			return nil, msg, fmt.Errorf(msg)
 		}
 		planSummary, planPerformed, isNonEmptyPlan, plan, planJsonOutput, err := diggerExecutor.Plan()
-		log.Printf("Path is cli/pkg/digger/digger.go: %s", planJsonOutput)
+		
 		if err != nil {
 			msg := fmt.Sprintf("Failed to Run mantis plan command. %v", err)
 			log.Printf(msg)

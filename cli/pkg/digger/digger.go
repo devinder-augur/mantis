@@ -611,7 +611,7 @@ func RunJob(
 				log.Printf("Failed to send usage report. %v", err)
 			}
 			_, _, _, plan, planJsonOutput, err := diggerExecutor.Plan()
-			log.Printf("Line 615 in cli/pkg/digger/digger.go %s", planJsonOutput)
+			
 			if err != nil {
 				msg := fmt.Sprintf("Failed to Run mantis plan command. %v", err)
 				log.Printf(msg)

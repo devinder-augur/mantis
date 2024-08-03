@@ -98,7 +98,7 @@ func RunJobs(jobs []orchestrator.Job, prService orchestrator.PullRequestService,
 				continue
 			}
 
-			executorResult, output, err := run(command, job, policyChecker, orgService, SCMOrganisation, SCMrepository, job.PullRequestNumber, job.RequestedBy, reporter, lock, prService, job.Namespace, workingDir, planStorage, appliesPerProject)
+			executorResult, output, planJson, err := run(command, job, policyChecker, orgService, SCMOrganisation, SCMrepository, job.PullRequestNumber, job.RequestedBy, reporter, lock, prService, job.Namespace, workingDir, planStorage, appliesPerProject)
 			if err != nil {
 				_, reportErr := backendApi.ReportProjectRun(SCMOrganisation+"-"+SCMrepository, job.ProjectName, runStartedAt, time.Now(), "FAILED", command, output)
 				if reportErr != nil {
@@ -112,11 +112,12 @@ func RunJobs(jobs []orchestrator.Job, prService orchestrator.PullRequestService,
 				break
 			}
 			exectorResults[i] = *executorResult
-
-			_, err = backendApi.ReportProjectRun(SCMOrganisation+"-"+SCMrepository, job.ProjectName, runStartedAt, time.Now(), "SUCCESS", command, output)
+			var runDetails backend.RunDetails
+			runDetails, err = backendApi.ReportProjectRun(SCMOrganisation+"-"+SCMrepository, job.ProjectName, runStartedAt, time.Now(), "SUCCESS", command, output)
 			if err != nil {
 				log.Printf("Error reporting project Run: %v", err)
 			}
+			ReportRunData(planJson, runDetails.Id)
 		}
 	}
 
@@ -188,19 +189,19 @@ func reportPolicyError(projectName string, command string, requestedBy string, r
 	return msg
 }
 
-func run(command string, job orchestrator.Job, policyChecker policy.Checker, orgService orchestrator.OrgService, SCMOrganisation string, SCMrepository string, PRNumber *int, requestedBy string, reporter reporting.Reporter, lock locking2.Lock, prService orchestrator.PullRequestService, projectNamespace string, workingDir string, planStorage storage.PlanStorage, appliesPerProject map[string]bool) (*execution.DiggerExecutorResult, string, error) {
+func run(command string, job orchestrator.Job, policyChecker policy.Checker, orgService orchestrator.OrgService, SCMOrganisation string, SCMrepository string, PRNumber *int, requestedBy string, reporter reporting.Reporter, lock locking2.Lock, prService orchestrator.PullRequestService, projectNamespace string, workingDir string, planStorage storage.PlanStorage, appliesPerProject map[string]bool) (*execution.DiggerExecutorResult, string, string, error) {
 	log.Printf("Running '%s' for project '%s' (workflow: %s)\n", command, job.ProjectName, job.ProjectWorkflow)
-
+	var planJson string
 	allowedToPerformCommand, err := policyChecker.CheckAccessPolicy(orgService, &prService, SCMOrganisation, SCMrepository, job.ProjectName, job.ProjectDir, command, job.PullRequestNumber, requestedBy, []string{})
 
 	if err != nil {
-		return nil, "error checking policy", fmt.Errorf("error checking policy: %v", err)
+		return nil, "error checking policy", planJson, fmt.Errorf("error checking policy: %v", err)
 	}
 
 	if !allowedToPerformCommand {
 		msg := reportPolicyError(job.ProjectName, command, requestedBy, reporter)
 		log.Println(msg)
-		return nil, msg, errors.New(msg)
+		return nil, msg, planJson, errors.New(msg)
 	}
 
 	err = job.PopulateAwsCredentialsEnvVarsForJob()
@@ -265,20 +266,20 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 		err = prService.SetStatus(*job.PullRequestNumber, "pending", job.ProjectName+"/plan")
 		if err != nil {
 			msg := fmt.Sprintf("Failed to set PR status. %v", err)
-			return nil, msg, fmt.Errorf(msg)
+			return nil, msg, planJson, fmt.Errorf(msg)
 		}
 		planSummary, planPerformed, isNonEmptyPlan, plan, planJsonOutput, err := diggerExecutor.Plan()
-
+		planJson = planJsonOutput
 		if err != nil {
 			msg := fmt.Sprintf("Failed to Run mantis plan command. %v", err)
 			log.Printf(msg)
 			err := prService.SetStatus(*job.PullRequestNumber, "failure", job.ProjectName+"/plan")
 			if err != nil {
 				msg := fmt.Sprintf("Failed to set PR status. %v", err)
-				return nil, msg, fmt.Errorf(msg)
+				return nil, msg, planJson, fmt.Errorf(msg)
 			}
 
-			return nil, msg, fmt.Errorf(msg)
+			return nil, msg, planJson, fmt.Errorf(msg)
 		} else if planPerformed {
 			if isNonEmptyPlan {
 				reportTerraformPlanOutput(reporter, projectLock.LockId(), plan)
@@ -286,7 +287,7 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 				if err != nil {
 					msg := fmt.Sprintf("Failed to validate plan. %v", err)
 					log.Printf(msg)
-					return nil, msg, fmt.Errorf(msg)
+					return nil, msg, planJson, fmt.Errorf(msg)
 				}
 				var planPolicyFormatter func(report string) string
 				summary := fmt.Sprintf("Terraform plan validation check (%v)", job.ProjectName)
@@ -315,7 +316,7 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 					}
 					msg := fmt.Sprintf("Plan is not allowed")
 					log.Printf(msg)
-					return nil, msg, fmt.Errorf(msg)
+					return nil, msg, planJson, fmt.Errorf(msg)
 				} else {
 					_, _, err := reporter.Report("Terraform plan validation checks succeeded :white_check_mark:", planPolicyFormatter)
 					if err != nil {
@@ -332,7 +333,7 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 			err := prService.SetStatus(*job.PullRequestNumber, "success", job.ProjectName+"/plan")
 			if err != nil {
 				msg := fmt.Sprintf("Failed to set PR status. %v", err)
-				return nil, msg, fmt.Errorf(msg)
+				return nil, msg, planJson, fmt.Errorf(msg)
 			}
 			result := execution.DiggerExecutorResult{
 				TerraformOutput: plan,
@@ -341,7 +342,7 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 					TerraformJson: planJsonOutput,
 				},
 			}
-			return &result, plan, nil
+			return &result, plan, planJson, nil
 		}
 	case "mantis apply":
 		appliesPerProject[job.ProjectName] = false
@@ -352,26 +353,26 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 		err = prService.SetStatus(*job.PullRequestNumber, "pending", job.ProjectName+"/apply")
 		if err != nil {
 			msg := fmt.Sprintf("Failed to set PR status. %v", err)
-			return nil, msg, fmt.Errorf(msg)
+			return nil, msg, planJson, fmt.Errorf(msg)
 		}
 
 		isMerged, err := prService.IsMerged(*job.PullRequestNumber)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to check if PR is merged. %v", err)
-			return nil, msg, fmt.Errorf(msg)
+			return nil, msg, planJson, fmt.Errorf(msg)
 		}
 
 		// this might go into some sort of "appliability" plugin later
 		isMergeable, err := prService.IsMergeable(*job.PullRequestNumber)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to check if PR is mergeable. %v", err)
-			return nil, msg, fmt.Errorf(msg)
+			return nil, msg, planJson, fmt.Errorf(msg)
 		}
 		log.Printf("PR status, mergeable: %v, merged: %v\n", isMergeable, isMerged)
 		if !isMergeable && !isMerged {
 			comment := reportApplyMergeabilityError(reporter)
 
-			return nil, comment, fmt.Errorf(comment)
+			return nil, comment, planJson, fmt.Errorf(comment)
 		} else {
 
 			// checking policies (plan, access)
@@ -382,14 +383,14 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 				if err != nil {
 					msg := fmt.Sprintf("Failed to retrieve stored plan. %v", err)
 					log.Printf(msg)
-					return nil, msg, fmt.Errorf(msg)
+					return nil, msg, planJson, fmt.Errorf(msg)
 				}
 
 				_, violations, err := policyChecker.CheckPlanPolicy(SCMrepository, SCMOrganisation, job.ProjectName, job.ProjectDir, terraformPlanJsonStr)
 				if err != nil {
 					msg := fmt.Sprintf("Failed to check plan policy. %v", err)
 					log.Printf(msg)
-					return nil, msg, fmt.Errorf(msg)
+					return nil, msg, planJson, fmt.Errorf(msg)
 				}
 				planPolicyViolations = violations
 			} else {
@@ -401,12 +402,12 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 			if err != nil {
 				msg := fmt.Sprintf("Failed to run plan policy check before apply. %v", err)
 				log.Printf(msg)
-				return nil, msg, fmt.Errorf(msg)
+				return nil, msg, planJson, fmt.Errorf(msg)
 			}
 			if !allowedToApply {
 				msg := reportPolicyError(job.ProjectName, command, requestedBy, reporter)
 				log.Println(msg)
-				return nil, msg, errors.New(msg)
+				return nil, msg, planJson, errors.New(msg)
 			}
 
 			// Running apply
@@ -418,15 +419,15 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 				err := prService.SetStatus(*job.PullRequestNumber, "failure", job.ProjectName+"/apply")
 				if err != nil {
 					msg := fmt.Sprintf("Failed to set PR status. %v", err)
-					return nil, msg, fmt.Errorf(msg)
+					return nil, msg, planJson, fmt.Errorf(msg)
 				}
 				msg := fmt.Sprintf("Failed to run mantis apply command. %v", err)
-				return nil, msg, fmt.Errorf(msg)
+				return nil, msg, planJson, fmt.Errorf(msg)
 			} else if applyPerformed {
 				err := prService.SetStatus(*job.PullRequestNumber, "success", job.ProjectName+"/apply")
 				if err != nil {
 					msg := fmt.Sprintf("Failed to set PR status. %v", err)
-					return nil, msg, fmt.Errorf(msg)
+					return nil, msg, planJson, fmt.Errorf(msg)
 				}
 				appliesPerProject[job.ProjectName] = true
 			}
@@ -434,7 +435,7 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 				TerraformOutput: output,
 				ApplyResult:     &execution.DiggerExecutorApplyResult{},
 			}
-			return &result, output, nil
+			return &result, output, planJson, nil
 		}
 	case "mantis destroy":
 		err := usage.SendUsageRecord(requestedBy, job.EventName, "destroy")
@@ -446,10 +447,10 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 		if err != nil {
 			log.Printf("Failed to Run mantis destroy command. %v", err)
 			msg := fmt.Sprintf("failed to run mantis destroy command: %v", err)
-			return nil, msg, fmt.Errorf("failed to Run mantis apply command. %v", err)
+			return nil, msg, planJson, fmt.Errorf("failed to Run mantis apply command. %v", err)
 		}
 		result := execution.DiggerExecutorResult{}
-		return &result, "", nil
+		return &result, "", planJson, nil
 
 	case "mantis unlock":
 		err := usage.SendUsageRecord(requestedBy, job.EventName, "unlock")
@@ -459,7 +460,7 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 		err = diggerExecutor.Unlock()
 		if err != nil {
 			msg := fmt.Sprintf("Failed to unlock project. %v", err)
-			return nil, msg, fmt.Errorf(msg)
+			return nil, msg, planJson, fmt.Errorf(msg)
 		}
 
 		if planStorage != nil {
@@ -476,14 +477,14 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 		err = diggerExecutor.Lock()
 		if err != nil {
 			msg := fmt.Sprintf("Failed to lock project. %v", err)
-			return nil, msg, fmt.Errorf(msg)
+			return nil, msg, planJson, fmt.Errorf(msg)
 		}
 
 	default:
 		msg := fmt.Sprintf("Command '%s' is not supported", command)
-		return nil, msg, fmt.Errorf(msg)
+		return nil, msg, planJson, fmt.Errorf(msg)
 	}
-	return &execution.DiggerExecutorResult{}, "", nil
+	return &execution.DiggerExecutorResult{}, "", planJson, nil
 }
 
 func reportApplyMergeabilityError(reporter reporting.Reporter) string {

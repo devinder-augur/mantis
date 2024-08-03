@@ -646,9 +646,11 @@ func RunJob(
 			} else {
 
 				runDetails, err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "SUCCESS", command, plan)
+				log.Printf("Run Details are  %v",  runDetails)
 				if err != nil {
 					log.Printf("Error reporting Run: %v", err)
 				} else {
+					log.Printf("Sending Rrun Details  %v",  "1")
 					ReportRunData(planJsonOutput, runDetails.Id)
 				}
 

@@ -1,9 +1,12 @@
 package digger
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path"
 	"strings"
@@ -97,7 +100,7 @@ func RunJobs(jobs []orchestrator.Job, prService orchestrator.PullRequestService,
 
 			executorResult, output, err := run(command, job, policyChecker, orgService, SCMOrganisation, SCMrepository, job.PullRequestNumber, job.RequestedBy, reporter, lock, prService, job.Namespace, workingDir, planStorage, appliesPerProject)
 			if err != nil {
-				reportErr := backendApi.ReportProjectRun(SCMOrganisation+"-"+SCMrepository, job.ProjectName, runStartedAt, time.Now(), "FAILED", command, output)
+				_, reportErr := backendApi.ReportProjectRun(SCMOrganisation+"-"+SCMrepository, job.ProjectName, runStartedAt, time.Now(), "FAILED", command, output)
 				if reportErr != nil {
 					log.Printf("error reporting project Run err: %v.\n", reportErr)
 				}
@@ -110,7 +113,7 @@ func RunJobs(jobs []orchestrator.Job, prService orchestrator.PullRequestService,
 			}
 			exectorResults[i] = *executorResult
 
-			err = backendApi.ReportProjectRun(SCMOrganisation+"-"+SCMrepository, job.ProjectName, runStartedAt, time.Now(), "SUCCESS", command, output)
+			_, err = backendApi.ReportProjectRun(SCMOrganisation+"-"+SCMrepository, job.ProjectName, runStartedAt, time.Now(), "SUCCESS", command, output)
 			if err != nil {
 				log.Printf("Error reporting project Run: %v", err)
 			}
@@ -265,7 +268,7 @@ func run(command string, job orchestrator.Job, policyChecker policy.Checker, org
 			return nil, msg, fmt.Errorf(msg)
 		}
 		planSummary, planPerformed, isNonEmptyPlan, plan, planJsonOutput, err := diggerExecutor.Plan()
-		log.Printf("Path is cli/pkg/digger/digger.go: %s", planJsonOutput)
+
 		if err != nil {
 			msg := fmt.Sprintf("Failed to Run mantis plan command. %v", err)
 			log.Printf(msg)
@@ -542,7 +545,7 @@ func RunJob(
 	runStartedAt := time.Now()
 	SCMOrganisation, SCMrepository := utils.ParseRepoNamespace(repo)
 	log.Printf("Running '%s' for project '%s'\n", job.Commands, job.ProjectName)
-
+	var runDetails backend.RunDetails
 	for _, command := range job.Commands {
 
 		allowedToPerformCommand, err := policyChecker.CheckAccessPolicy(orgService, nil, SCMOrganisation, SCMrepository, job.ProjectName, job.ProjectDir, command, nil, requestedBy, []string{})
@@ -557,7 +560,7 @@ func RunJob(
 				log.Printf("Error publishing comment: %v", err)
 			}
 			log.Println(msg)
-			err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "FORBIDDEN", command, msg)
+			_, err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "FORBIDDEN", command, msg)
 			if err != nil {
 				log.Printf("Error reporting Run: %v", err)
 			}
@@ -611,11 +614,11 @@ func RunJob(
 				log.Printf("Failed to send usage report. %v", err)
 			}
 			_, _, _, plan, planJsonOutput, err := diggerExecutor.Plan()
-			log.Printf("Line 615 in cli/pkg/digger/digger.go %s", planJsonOutput)
+
 			if err != nil {
 				msg := fmt.Sprintf("Failed to Run mantis plan command. %v", err)
 				log.Printf(msg)
-				err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "FAILED", command, msg)
+				_, err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "FAILED", command, msg)
 				if err != nil {
 					log.Printf("Error reporting Run: %v", err)
 				}
@@ -626,7 +629,7 @@ func RunJob(
 			if err != nil {
 				msg := fmt.Sprintf("Failed to validate plan %v", err)
 				log.Printf(msg)
-				err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "FAILED", command, msg)
+				_, err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "FAILED", command, msg)
 				if err != nil {
 					log.Printf("Error reporting Run: %v", err)
 				}
@@ -635,16 +638,20 @@ func RunJob(
 			if !planIsAllowed {
 				msg := fmt.Sprintf("Plan is not allowed")
 				log.Printf(msg)
-				err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "FAILED", command, msg)
+				_, err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "FAILED", command, msg)
 				if err != nil {
 					log.Printf("Error reporting Run: %v", err)
 				}
 				return fmt.Errorf(msg)
 			} else {
-				err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "SUCCESS", command, plan)
+
+				runDetails, err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "SUCCESS", command, plan)
 				if err != nil {
 					log.Printf("Error reporting Run: %v", err)
+				} else {
+					ReportRunData(planJsonOutput, runDetails.Id)
 				}
+
 			}
 
 		case "mantis apply":
@@ -656,13 +663,13 @@ func RunJob(
 			if err != nil {
 				msg := fmt.Sprintf("Failed to Run mantis apply command. %v", err)
 				log.Printf(msg)
-				err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "FAILED", command, msg)
+				_, err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "FAILED", command, msg)
 				if err != nil {
 					log.Printf("Error reporting Run: %v", err)
 				}
 				return fmt.Errorf(msg)
 			}
-			err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "SUCCESS", command, output)
+			_, err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "SUCCESS", command, output)
 			if err != nil {
 				log.Printf("Error reporting Run: %v", err)
 			}
@@ -682,13 +689,15 @@ func RunJob(
 			if err != nil {
 				return fmt.Errorf("failed to Run digger drift-detect command. %v", err)
 			}
-			err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "SUCCESS", command, output)
+			_, err = backendApi.ReportProjectRun(repo, job.ProjectName, runStartedAt, time.Now(), "SUCCESS", command, output)
 			if err != nil {
 				log.Printf("Error reporting Run: %v", err)
 			}
+
 		}
 
 	}
+
 	return nil
 }
 
@@ -789,4 +798,44 @@ func MergePullRequest(ciService orchestrator.PullRequestService, prNumber int) {
 	} else {
 		log.Printf("PR is already merged, skipping merge step")
 	}
+}
+
+type TFPostData struct {
+	TfPlanJson string `json:"terraform_plan_json"`
+	JobId      int    `json:"job_id"`
+}
+
+func ReportRunData(planJsonOutput string, jobId int) error {
+	plan_upload_destination := os.Getenv("PLAN_UPLOAD_DESTINATION")
+	plan_upload_http_endpoint := strings.ToLower(os.Getenv("PLAN_UPLOAD_HTTP_ENDPOINT"))
+	plan_upload_http_method := os.Getenv("PLAN_UPLOAD_HTTP_METHOD")
+
+	if plan_upload_destination == "rest" && plan_upload_http_endpoint != "" && plan_upload_http_method != "" {
+		_, err := sendPostRequest(plan_upload_http_endpoint, plan_upload_http_method, TFPostData{TfPlanJson: planJsonOutput, JobId: jobId})
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
+	}
+	return nil
+}
+
+func sendPostRequest(url string, method string, data TFPostData) (*http.Response, error) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+
+	return resp, nil
 }

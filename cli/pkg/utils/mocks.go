@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"time"
+
+	"github.com/diggerhq/digger/cli/pkg/core/backend"
 	"github.com/diggerhq/digger/cli/pkg/core/execution"
 	"github.com/diggerhq/digger/libs/orchestrator/scheduler"
-	"time"
 
 	"github.com/diggerhq/digger/libs/orchestrator"
 )
@@ -140,8 +142,8 @@ func (t MockBackendApi) ReportProject(namespace string, projectName string, conf
 	return nil
 }
 
-func (t MockBackendApi) ReportProjectRun(repo string, projectName string, startedAt time.Time, endedAt time.Time, status string, command string, output string) error {
-	return nil
+func (t MockBackendApi) ReportProjectRun(repo string, projectName string, startedAt time.Time, endedAt time.Time, status string, command string, output string) (backend.RunDetails, error) {
+	return backend.RunDetails{}, nil
 }
 
 func (t MockBackendApi) ReportProjectJobStatus(repo string, projectName string, jobId string, status string, timestamp time.Time, summary *execution.DiggerExecutorPlanResult, PrCommentUrl string, terraformOutput string) (*scheduler.SerializedBatch, error) {
